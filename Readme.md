@@ -1,5 +1,5 @@
 # rhacs-kind
-A development setup for RHACS operator-based deployment of central services in a Kind cluster that uses a local registry.
+A development setup for RHACS operator-based deployment in a Kind cluster that uses a local registry.
 
 ## Prerequisites
 1. Installed kind and docker
