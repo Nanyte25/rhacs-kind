@@ -24,7 +24,8 @@ SCANNER_BUILD_CMD := go build -buildvcs=false -trimpath -ldflags="-X github.com/
 .PHONY: clone-repos
 clone-repos:
 	sh scripts/clone-repo.sh git@github.com:$(SCANNER_GIT_REPO_OWNER)/scanner.git && \
-	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/stackrox.git
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/stackrox.git && \
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/collector.git
 
 .PHONY: clean
 clean: delete-cluster
