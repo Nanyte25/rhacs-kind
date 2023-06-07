@@ -1,72 +1,63 @@
 # rhacs-kind
-A development setup for RHACS operator-based deployment in a Kind cluster that uses a local registry.
+A development setup for RHACS operator-based deploy in a kind cluster and with a local registry.
 
 ## Prerequisites
-1. Installed kind and docker
-3. Clone your fork of this repository and in it clone the other repositories (#todo use make to clone).
+1. Installed kind and docker binaries.
+3. Clone your fork of this repository.
   ```
   $ git clone git@github.com:<user>/rhacs-kind.git
   $ cd rhacs-kind
-  $ git clone git@github.com:<user>/stackrox.git
-  $ git clone git@github.com:<user>/scanner.git
   ```
+
+> Note: No need to use a fork repo if you don't intend to contribute upstream.
 
 ## Set up the kind cluster
 
-1. Create the cluster.
+1. Bootstrap the cluster and base resources. When it's done, it will show a link to the k8s dashboard and a login token.
 ```
-$ make create-cluster
+$ make boostrap
 ```
 
-2. Run k8s dashboard for monitoring your work.
+To run k8s dashboard for monitoring on a separate terminal.
 ```
-$ make run-k8s-dashboard
-
-# Use the token below and go to the link provided
 $ make run-k8s-dashboard
 ```
 
-## Set up scanner
-
-1. Initialize the scanner build.
+## Deploy resources needed to create a Central instance
 ```
-$ make init-scanner-build
+$ make up
 ```
+> This can take a while as it will build the images of at least the scanner, central, collecttor, and push them to the local registry.
 
-2. Build and push scanner.
-```
-$ make build-scanner build-scanner-db
-$ make push-scanner push-scanner-db
-```
-
-3. Build and push central
-```
-$ make build-central
-$ make push-central
-```
-
-## Now that all the required images are pushed the operator can now be run locally.
-
-1. Build and run the stackrox operator
-
+## Build and Run the stackrox operator
 ```
 $ make build-operator run-operator
 ```
 
-2. Apply an example Central CR
-
+## Deploy an example Central instance
 ```
-$ kubectl crate ns stackrox
-$ kubectl apply -n stackrox -f tests/common/central-cr.yaml
+$ make deploy-example-central
 ```
 
-## Develop
+## Deploy a Secured Cluster instance after the Central services are up without errors.
+```
+$ make deploy-example-secured-cluster
+```
 
-1. To develop, just rebuild the images accordingly and restart a pod or redeploy central services.
+## Initialize monitoring
+```
+$ make init-monitoring
+```
 
-## K8s Dashboard
-![Pods](./images/pods.png "Pods")
+## Run the following to port-forward the prometheus console
+```
+$ make run-prometheus-console
+```
+## Initialize the monitoring metrics
+```
+$ make init-monitoring-metrics
+```
 
-
-## Todo
-1. Automate commands above as possible
+## Notes
+1. Scanner and Central pods can take a while to load due to their DBs taking time to load.
+2. Image builds can take a while.

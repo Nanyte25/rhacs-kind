@@ -2,13 +2,15 @@ apiVersion: monitoring.coreos.com/v1
 kind: Prometheus
 metadata:
   name: prometheus
-  namespace: stackrox
+  namespace: monitoring
 spec:
   serviceAccountName: prometheus
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
   podMonitorSelector:
     matchLabels:
       app: rhacs
   resources:
     requests:
       memory: 400Mi
-  enableAdminAPI: false
+  enableAdminAPI: true

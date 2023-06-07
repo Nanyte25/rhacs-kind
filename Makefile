@@ -23,16 +23,12 @@ SCANNER_BUILD_CMD := go build -buildvcs=false -trimpath -ldflags="-X github.com/
 
 .PHONY: clone-repos
 clone-repos:
-	sh scripts/clone-repo.sh git@github.com:$(SCANNER_GIT_REPO_OWNER)/scanner.git && \
-	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/stackrox.git && \
-	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/collector.git
+	sh scripts/clone-repo.sh git@github.com:$(SCANNER_GIT_REPO_OWNER)/scanner.git scanner;  \
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/stackrox.git stackrox;  \
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/collector.git collector
 
 .PHONY: clean
 clean: delete-cluster
-	@read -p "Continue to delete the local scanner and stackrox repos/dirs? [y/n]: " yn; \
-    if [ "$$yn" = "y" ]; then \
-        rm -rf scanner stackrox; \
-    fi
 
 .PHONY: create-namespaces
 create-namespaces:
@@ -144,28 +140,51 @@ run-operator:
 	make -C stackrox/operator run \
 		ROX_IMAGE_FLAVOR=development_build
 
-
 .PHONY: deploy-example-central
 deploy-example-central:
-	kubectl apply -f stackrox/operator/tests/common/central-cr.yaml -n stackrox
-
+	kubectl -n stackrox apply -f manifests/example-central.yaml
 
 .PHONY: delete-example-central
 delete-example-central:
 	kubectl delete central stackrox-central-services -n stackrox
 
+.PHONY: deploy-example-secured-cluster
+deploy-example-secured-cluster:
+	kubectl apply -n stackrox -f tests/common/secured-cluster-cr.yaml
+
 .PHONY: init-monitoring
 init-monitoring:
-	kubectl -n stackrox create -f manifests/prometheus-operator-bundle.yaml || \
-	kubectl -n stackrox wait --for=condition=Ready pods -l  app.kubernetes.io/name=prometheus-operator && \
-	kubectl -n stackrox apply -f manifests/prometheus-rbac.yaml && \
-	kubectl -n stackrox apply -f manifests/rhacs-central-metrics.yaml && \
-	kubectl -n stackrox apply -f manifests/rhacs-scanner-metrics.yaml && \
-	kubectl -n stackrox apply -f manifests/prometheus.yaml && \
-	kubectl -n stackrox wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus && \
-	kubectl -n stackrox apply -f manifests/prometheus-service.yaml && \
-	kubectl -n stackrox port-forward --address localhost pod/prometheus-prometheus-0 9090:9090
+	kubectl create ns monitoring || \
+	kubectl -n monitoring create -f manifests/prometheus-operator-bundle.yaml || \
+	kubectl -n monitoring wait --for=condition=Ready pods -l  app.kubernetes.io/name=prometheus-operator && \
+	kubectl -n monitoring apply -f manifests/prometheus-rbac.yaml && \
+	kubectl -n monitoring apply -f manifests/prometheus.yaml && \
+	kubectl -n monitoring wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus && \
+	kubectl -n monitoring apply -f manifests/prometheus-service.yaml
 
+.PHONY: run-prometheus-console
+run-prometheus-console:
+	kubectl -n monitoring port-forward --address localhost pod/prometheus-prometheus-0 9090:9090
 
+.PHONY: init-monitoring-metrics
+init-monitoring-metrics: init-monitoring
+	sh scripts/clone-repo.sh https://github.com/kubernetes/kube-state-metrics.git kube-state-metrics; \
+	kubectl apply -f kube-state-metrics/examples/standard; \
+	kubectl apply -f manifests/kube-state-metrics.yaml; \
+	kubectl -n monitoring apply -f manifests/rhacs-central-metrics.yaml; \
+	kubectl -n monitoring apply -f manifests/rhacs-scanner-metrics.yaml
+	kubectl -n monitoring apply -f manifests/node-exporter.yaml
+
+.PHONY: delete-monitoring
+delete-monitoring:
+	kubectl delete crd scrapeconfigs.monitoring.coreos.com || \
+	kubectl delete crd thanosruler.monitoring.coreos.com || \
+	kubectl delete crd prometheusagent.monitoring.coreos.com || \
+	kubectl delete crd prometheus.monitoring.coreos.com || \
+	kubectl delete crd prometheusrule.monitoring.coreos.com || \
+	kubectl delete crd alertmanagerconfig.monitoring.coreos.com || \
+	kubectl delete crd alertmanager.monitoring.coreos.com || \
+	kubectl delete crd podmonitor.monitoring.coreos.com || \
+	kubectl delete ns monitoring
 
 

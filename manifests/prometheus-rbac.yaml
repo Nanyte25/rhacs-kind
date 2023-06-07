@@ -16,18 +16,15 @@ rules:
   - services
   - endpoints
   - pods
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources:
+  - prometheusrules
+  - servicemonitors
+  - secrets
+  - namespaces
+  - statefulsets
+  - alertmanagers
+  - thanosrulers
   - configmaps
-  verbs: ["get"]
-- apiGroups:
-  - networking.k8s.io
-  resources:
-  - ingresses
   verbs: ["get", "list", "watch"]
-- nonResourceURLs: ["/metrics"]
-  verbs: ["get"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -41,4 +38,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: prometheus
-  namespace: default
+  namespace: monitoring

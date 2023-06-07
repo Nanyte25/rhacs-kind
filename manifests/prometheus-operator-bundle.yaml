@@ -38301,7 +38301,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: prometheus-operator
-  namespace: stackrox
+  namespace: monitoring
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -38398,7 +38398,7 @@ metadata:
     app.kubernetes.io/name: prometheus-operator
     app.kubernetes.io/version: 0.65.2
   name: prometheus-operator
-  namespace: stackrox
+  namespace: monitoring
 spec:
   replicas: 1
   selector:
@@ -38455,7 +38455,7 @@ metadata:
     app.kubernetes.io/name: prometheus-operator
     app.kubernetes.io/version: 0.65.2
   name: prometheus-operator
-  namespace: stackrox
+  namespace: monitoring
 ---
 apiVersion: v1
 kind: Service
@@ -38465,7 +38465,7 @@ metadata:
     app.kubernetes.io/name: prometheus-operator
     app.kubernetes.io/version: 0.65.2
   name: prometheus-operator
-  namespace: stackrox
+  namespace: monitoring
 spec:
   clusterIP: None
   ports:
