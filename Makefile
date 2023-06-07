@@ -150,7 +150,7 @@ delete-example-central:
 
 .PHONY: deploy-example-secured-cluster
 deploy-example-secured-cluster:
-	kubectl apply -n stackrox -f tests/common/secured-cluster-cr.yaml
+	kubectl apply -n stackrox -f stackrox/operator/tests/common/secured-cluster-cr.yaml
 
 .PHONY: init-monitoring
 init-monitoring:
