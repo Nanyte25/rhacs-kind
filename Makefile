@@ -150,6 +150,9 @@ delete-example-central:
 
 .PHONY: deploy-example-secured-cluster
 deploy-example-secured-cluster:
+	kubectl -n stackrox exec deploy/central -- \
+  	roxctl central init-bundles generate my-test-bundle --insecure-skip-tls-verify --password letmein --output-secrets - \
+  | kubectl -n stackrox apply -f -
 	kubectl apply -n stackrox -f stackrox/operator/tests/common/secured-cluster-cr.yaml
 
 .PHONY: init-monitoring
@@ -175,6 +178,7 @@ init-monitoring-metrics: init-monitoring
 	kubectl -n monitoring apply -f manifests/rhacs-scanner-metrics.yaml
 	kubectl -n monitoring apply -f manifests/node-exporter.yaml
 
+
 .PHONY: delete-monitoring
 delete-monitoring:
 	kubectl delete crd scrapeconfigs.monitoring.coreos.com || \
@@ -188,3 +192,11 @@ delete-monitoring:
 	kubectl delete ns monitoring
 
 
+.PHONY: up-ui
+up-ui:
+	make -C stackrox/ui start
+
+
+PHONY: docker-rm-exited
+docker-rm-exited:
+	sh scripts/docker-rm-exited-containers.sh

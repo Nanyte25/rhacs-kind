@@ -1,0 +1,1 @@
+docker rm $(docker ps -a | grep Exited | awk 'NR>1{print $1}')
