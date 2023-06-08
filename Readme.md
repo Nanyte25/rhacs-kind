@@ -58,6 +58,14 @@ $ make run-prometheus-console
 $ make init-monitoring-metrics
 ```
 
+## Launch the stackrox UI
+```
+$ kubectl -n stackrox port-forward deploy/central --address localhost 8000:8443
+
+# This can take time for the UI to load and set up a reverse proxy.
+$ make up-ui
+```
+
 ## Notes
 1. Scanner and Central pods can take a while to load due to their DBs taking time to load.
 2. Image builds can take a while.
