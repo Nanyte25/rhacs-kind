@@ -1,13 +1,14 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # Specify forked repos for development purposes.
-SCANNER_GIT_REPO_OWNER := stackrox
-STACKROX_GIT_REPO_OWNER := stackrox
+SCANNER_GIT_REPO_OWNER := pepedocs
+STACKROX_GIT_REPO_OWNER := pepedocs
 
 # Set the following to point to a specific image tag.
 SCANNER_BUILD_TAG := latest
 CENTRAL_BUILD_TAG := latest
 COLLECTOR_BUILD_TAG := latest
+FLEETMANAGER_BUILD_TAG := latest
 
 # The following variables are used by the operator as env vars.
 export RELATED_IMAGE_MAIN := localhost:5001/main:$(CENTRAL_BUILD_TAG)
@@ -19,13 +20,14 @@ export RELATED_IMAGE_COLLECTOR_FULL := localhost:5001/collector:$(COLLECTOR_BUIL
 
 # We are using a git repo for building scanner images. Unfortunately, go cares about .git
 # directories therefore we have to patch the build command with -buildvcs=false.
-SCANNER_BUILD_CMD := go build -buildvcs=false -trimpath -ldflags="-X github.com/stackrox/scanner/pkg/version.Version=$(TAG)" -o scanner/image/scanner/bin/scanner ./cmd/clair
+SCANNER_BUILD_CMD := go build -buildvcs=false -trimpath -ldflags="-X github.com/stackrox/scanner/pkg/version.Version=$(TAG)" -o image/scanner/bin/scanner ./cmd/clair
 
 .PHONY: clone-repos
 clone-repos:
-	sh scripts/clone-repo.sh git@github.com:$(SCANNER_GIT_REPO_OWNER)/scanner.git scanner;  \
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/scanner.git scanner;  \
 	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/stackrox.git stackrox;  \
-	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/collector.git collector
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/collector.git collector true; \
+	sh scripts/clone-repo.sh git@github.com:$(STACKROX_GIT_REPO_OWNER)/acs-fleet-manager.git acs-fleet-manager
 
 .PHONY: clean
 clean: delete-cluster
@@ -65,9 +67,9 @@ up: up-scanner up-central up-collector build-operator run-operator
 
 .PHONY: up-scanner
 ifeq (,$(wildcard scanner/image/scanner/dump/dump.zip))
-up-scanner: init-scanner-build build-scanner push-scanner push-scanner-db
+up-scanner: init-scanner-build build-scanner build-scanner-db push-scanner push-scanner-db
 else
-up-scanner: build-scanner push-scanner push-scanner-db
+up-scanner: build-scanner build-scanner-db push-scanner push-scanner-db
 endif
 
 .PHONY: up-central
@@ -93,11 +95,11 @@ push-scanner-db:
 
 .PHONY: build-scanner
 build-scanner:
-	make -C scanner scanner-image BUILD_CMD="$(SCANNER_BUILD_CMD)" TAG=$(SCANNER_BUILD_TAG)
+	make -C scanner scanner-image BUILD_CMD='$(SCANNER_BUILD_CMD)' TAG=$(SCANNER_BUILD_TAG)
 
 .PHONY: build-scanner-db
 build-scanner-db:
-	make -C scanner db-image BUILD_CMD="$(SCANNER_BUILD_CMD)" TAG=$(SCANNER_BUILD_TAG)
+	make -C scanner db-image BUILD_CMD='$(SCANNER_BUILD_CMD)' TAG=$(SCANNER_BUILD_TAG)
 
 .PHONY: build-central
 build-central:
@@ -162,12 +164,13 @@ init-monitoring:
 	kubectl -n monitoring wait --for=condition=Ready pods -l  app.kubernetes.io/name=prometheus-operator && \
 	kubectl -n monitoring apply -f manifests/prometheus-rbac.yaml && \
 	kubectl -n monitoring apply -f manifests/prometheus.yaml && \
-	kubectl -n monitoring wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus && \
+	kubectl -n monitoring wait --for=condition=Ready pods -l app.kubernetes.io/name=prometheus-operator && \
 	kubectl -n monitoring apply -f manifests/prometheus-service.yaml
 
 .PHONY: run-prometheus-console
 run-prometheus-console:
-	kubectl -n monitoring port-forward --address localhost pod/prometheus-prometheus-0 9090:9090
+	$(eval POD=$(shell kubectl -n monitoring get pods | grep prometheus-operator- | awk 'NR==1{print $$1}'))
+	kubectl -n monitoring port-forward --address localhost $(POD) 9090:9090
 
 .PHONY: init-monitoring-metrics
 init-monitoring-metrics: init-monitoring
@@ -175,9 +178,12 @@ init-monitoring-metrics: init-monitoring
 	kubectl apply -f kube-state-metrics/examples/standard; \
 	kubectl apply -f manifests/kube-state-metrics.yaml; \
 	kubectl -n monitoring apply -f manifests/rhacs-central-metrics.yaml; \
-	kubectl -n monitoring apply -f manifests/rhacs-scanner-metrics.yaml
-	kubectl -n monitoring apply -f manifests/node-exporter.yaml
-
+	kubectl -n monitoring apply -f manifests/rhacs-scanner-metrics.yaml; \
+	kubectl -n monitoring apply -f manifests/node-exporter.yaml; \
+	kubectl -n monitoring create secret generic additional-scrape-configs \
+		--from-file manifests/cadvisor-scrape-config.yaml \
+		--dry-run=client -oyaml > manifests/additional-scrape-configs.yaml; \
+	kubectl -n monitoring apply -f manifests/additional-scrape-configs.yaml
 
 .PHONY: delete-monitoring
 delete-monitoring:
@@ -191,12 +197,52 @@ delete-monitoring:
 	kubectl delete crd podmonitor.monitoring.coreos.com || \
 	kubectl delete ns monitoring
 
+.PHONY: ui-port-forward
+ui-port-forward:
+	kubectl -n stackrox port-forward deploy/central --address localhost 8000:8443
 
 .PHONY: up-ui
 up-ui:
 	make -C stackrox/ui start
 
-
 PHONY: docker-rm-exited
 docker-rm-exited:
 	sh scripts/docker-rm-exited-containers.sh
+
+.PHONY: bootstrap-fleet-manager
+bootstrap-fleet-manager:
+	make -C acs-fleet-manager deploy/bootstrap
+
+.PHONY: build-fleet-manager
+build-fleet-manager:
+	make -C acs-fleet-manager/ image/build/local
+
+.PHONY: push-fleet-manager
+push-fleet-manager:
+	docker tag fleet-manager:$(FLEETMANAGER_BUILD_TAG) localhost:5001/fleet-manager:$(FLEETMANAGER_BUILD_TAG) && \
+	docker push localhost:5001/fleet-manager:$(FLEETMANAGER_BUILD_TAG)
+
+.PHONY: clean-fleet-maanger
+clean-fleet-manager:
+	docker rm -f fleet-manager-db && \
+	docker network rm fleet-manager-network
+
+.PHONY: init-fleet-manager
+init-fleet-manager: build-fleet-manager push-fleet-manager
+	make -C acs-fleet-manager binary && \
+	make -C acs-fleet-manager db/setup && \
+	make -C acs-fleet-manager db/migrate && \
+	make -C acs-fleet-manager secrets/touch
+
+.PHONY: up-fleet-manager
+up-fleet-manager:
+	cd ./acs-fleet-manager && \
+	OCM_ENV=development ./fleet-manager --force-leader \
+		--dataplane-cluster-config-file=../config/dataplane-cluster-configuration-kind.yaml \
+		--fleetshard-authz-config-file=../config/fleetshard-authz-org-ids-development.yaml \
+		--central-idp-client-id="123" --central-idp-client-secret-file=<(echo "456") \
+		--api-server-bindaddress localhost:9000 serve
+
+.PHONY: up-fleetshard-sync
+up-fleetshard-sync:
+	cd ./acs-fleet-manager && ./fleetshard-sync

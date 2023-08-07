@@ -13,4 +13,7 @@ spec:
   resources:
     requests:
       memory: 400Mi
+  additionalScrapeConfigs:
+    name: additional-scrape-configs
+    key: cadvisor-scrape-config.yaml
   enableAdminAPI: true
