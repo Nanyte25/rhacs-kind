@@ -1,8 +1,8 @@
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 # Specify forked repos for development purposes.
-SCANNER_GIT_REPO_OWNER := pepedocs
-STACKROX_GIT_REPO_OWNER := pepedocs
+SCANNER_GIT_REPO_OWNER := stackrox
+STACKROX_GIT_REPO_OWNER := stackrox
 
 # Set the following to point to a specific image tag.
 SCANNER_BUILD_TAG := latest
